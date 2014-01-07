@@ -166,7 +166,7 @@ class ChartController {
      * Action to get the counts for the children of the passed in concept key
      */
     def childConceptPatientCounts = {
-    		def user = AuthUser.findByUsername(springSecurityService.getPrincipal().username)
+    		def user = springSecurityService.getPrincipal()
     		log.trace("Called childConceptPatientCounts action in ChartController")
     		log.trace("User is:"+user.username);
     		log.trace(user.toString());
@@ -702,8 +702,19 @@ def analysisGrid = {
 				def ck = prefix+i2b2HelperService.getConceptPathFromCode(cc);
 				conceptKeys.add(ck);
 			}
-		}else{
-			conceptKeys.add(concept_key);
+		} else {
+            def leafSet = []
+            def fetchChildren = { inRoot ->
+                inRoot.each {
+                    leafSet << it
+                    def childNodes = i2b2HelperService.getChildPathsFromParentKey(it).collect {
+                        prefix + it
+                    }
+                    if(childNodes)
+                        owner.call(childNodes)
+                }
+            }([concept_key])
+            conceptKeys.addAll(leafSet)
 		}
 
 		//	println(prefix);
@@ -711,7 +722,7 @@ def analysisGrid = {
 //		println("org concept key:"+concept_key);
 		for(ck in conceptKeys){
 	//	println("new conceptkeys:"+ck);
-		if(s1){i2b2HelperService.addConceptDataToTable(table,ck , result_instance_id1);}
+		if(s1){i2b2HelperService.addConceptDataToTable(table, ck, result_instance_id1);}
 		if(s2){i2b2HelperService.addConceptDataToTable(table, ck, result_instance_id2);}
 		}
 		pw.write(table.toJSONObject().toString(5));

@@ -18,6 +18,8 @@
  ******************************************************************/
   
 
+
+import org.omg.CORBA.Environment
 import org.springframework.web.multipart.MultipartFile;
 import org.transmart.biomart.BioAssayAnalysisData;
 import org.transmart.biomart.BioAssayDataAnnotation;
@@ -287,7 +289,7 @@ public class GeneSignatureService {
 
 		// load fresh gs and modify
 		gs = GeneSignature.get(gs.id)
-		gs.modifiedByAuthUser = AuthUser.findByUsername(springSecurityService.getPrincipal().username)
+		gs.modifiedByAuthUser = springSecurityService.getPrincipal()
 		gs.lastUpdated = new Date()
 		gs.validate()
 		def saved = gs
@@ -358,7 +360,7 @@ public class GeneSignatureService {
 		if(invalidSymbols.size()>0) FileSchemaException.ThrowInvalidGenesFileSchemaException(invalidSymbols);
 
 		// modify gs and add new items
-		gs.modifiedByAuthUser = AuthUser.findByUsername(springSecurityService.getPrincipal().username)
+		gs.modifiedByAuthUser = springSecurityService.getPrincipal()
 		gs.lastUpdated = new Date()
 
 		// add new items
@@ -547,13 +549,28 @@ public class GeneSignatureService {
 	}
 	
 	/**
-	 * gets a lit of permissioned gene signature records the user is allowed to view. The returned
-	 * items are list of domain objects
+	 * Gets a list of gene signature records the user is allowed to view.
 	 */
-	def listPermissionedGeneSignatures(Long userId, boolean bAdmin) {
-		def permCriteria = (bAdmin) ? "(1=1)" : "(gs.createdByAuthUser.id="+userId+" or gs.publicFlag=true)"
-		def qBuf = "from GeneSignature gs where "+permCriteria+" and gs.deletedFlag=false order by gs.name"
-		return GeneSignature.findAll(qBuf);
+	def listPermissionedGeneSignatures(AuthUser user) {
+		def results = null
+		def sql = "from GeneSignature gs where "
+		def admin = false
+		for (role in user.authorities){
+			if (role.authority.equals("ROLE_ADMIN") || role.authority.equals("ROLE_DATASET_EXPLORER_ADMIN"))	{
+				admin=true
+				break
+			}
+		}
+		if (admin)	{
+			results = GeneSignature.findAll(
+				"from GeneSignature gs where gs.deletedFlag = ? order by gs.name",
+				[false])
+		} else	{
+			results = GeneSignature.findAll(
+				"from GeneSignature gs where (gs.createdByAuthUser.id = ? or gs.publicFlag = ?) and gs.deletedFlag = ? order by gs.name",
+				[user.id, true, false])
+		}
+		return results
 	}
 
 	/**
@@ -565,7 +582,7 @@ public class GeneSignatureService {
 		/*
 		// this code only gets the gene count per gene sig, could not use HQL using aggregate function to count up and down regulation
 
-		def permCriteria = (bAdmin) ? "(1=1)" : "(i.geneSignature.createdByAuthUser.id="+userId+" or i.geneSignature.publicFlag=true)"
+		def permCriteria = (bAdmin) ? "(1=1)" : "(gs.CREATED_BY_AUTH_USER_ID="+userId+" or gs.PUBLIC_FLAG = 1 )"
 		// 1) total gene count
 		def selectItems = "i.geneSignature.id"
 		StringBuffer qBuf = new StringBuffer();
@@ -587,7 +604,7 @@ public class GeneSignatureService {
 		StringBuffer nativeSQL = new StringBuffer();
 		nativeSQL.append("select gsi.SEARCH_GENE_SIGNATURE_ID as id, count(*) Gene_Ct, sum(CASE WHEN gsi.FOLD_CHG_METRIC>0 THEN 1 ELSE 0 END) Up_Ct, sum(CASE WHEN gsi.FOLD_CHG_METRIC<0 THEN 1 ELSE 0 END) Down_Ct ");
 		nativeSQL.append("from SEARCH_GENE_SIGNATURE_ITEM gsi join SEARCH_GENE_SIGNATURE gs on gsi.search_gene_signature_id=gs.search_gene_signature_id ");
-		nativeSQL.append("where "+permCriteria+" and gs.DELETED_FLAG=FALSE ");
+		nativeSQL.append("where "+permCriteria+" and gs.DELETED_FLAG = 0 " );
 		nativeSQL.append("group by gsi.SEARCH_GENE_SIGNATURE_ID");
 
 		// execute native sql on hibernate session
