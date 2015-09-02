@@ -1,4 +1,6 @@
-transmartApp
+Legecy transmartApp with special web interfaces added.
 ============
 
-tranSMART is a knowledge management platform that enables scientists to develop and refine research hypotheses by investigating correlations between genetic and phenotypic data, and assessing their analytical results in the context of published literature and other work.
+Please note: this is based on a version 1.0 of transmartApp and NO CIRCUMSTANCES should be assumed current or functional.
+
+It was and is an experimental version of the application.
